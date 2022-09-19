@@ -1,10 +1,11 @@
 package pprof
 
 import (
+	"net/http/pprof"
+
 	"github.com/cloudwego/hertz/pkg/app/server"
 	"github.com/cloudwego/hertz/pkg/route"
-	"net/http"
-	"net/http/pprof"
+	"github.com/hertz-contrib/pprof/adaptor"
 )
 
 const (
@@ -35,20 +36,18 @@ func RouteRegister(rg *route.RouterGroup, prefixOptions ...string) {
 
 	prefixRouter := rg.Group(prefix)
 	{
-		index := http.HandlerFunc(pprof.Index)
-		prefixRouter.GET("/", NewHertzHTTPHandler(index))
-		cmdLine := http.HandlerFunc(pprof.Cmdline)
-		prefixRouter.GET("/cmdline", NewHertzHTTPHandler(cmdLine))
+		prefixRouter.GET("/", adaptor.NewHertzHTTPHandlerFunc(pprof.Index))
+		prefixRouter.GET("/cmdline", adaptor.NewHertzHTTPHandlerFunc(pprof.Cmdline))
 
-		prefixRouter.GET("/profile", NewHertzHTTPHandlerFunc(pprof.Profile))
-		prefixRouter.POST("/symbol", NewHertzHTTPHandlerFunc(pprof.Symbol))
-		prefixRouter.GET("/symbol", NewHertzHTTPHandlerFunc(pprof.Symbol))
-		prefixRouter.GET("/trace", NewHertzHTTPHandlerFunc(pprof.Trace))
-		prefixRouter.GET("/allocs", NewHertzHTTPHandlerFunc(pprof.Handler("allocs").ServeHTTP))
-		prefixRouter.GET("/block", NewHertzHTTPHandlerFunc(pprof.Handler("block").ServeHTTP))
-		prefixRouter.GET("/goroutine", NewHertzHTTPHandlerFunc(pprof.Handler("goroutine").ServeHTTP))
-		prefixRouter.GET("/heap", NewHertzHTTPHandlerFunc(pprof.Handler("heap").ServeHTTP))
-		prefixRouter.GET("/mutex", NewHertzHTTPHandlerFunc(pprof.Handler("mutex").ServeHTTP))
-		prefixRouter.GET("/threadcreate", NewHertzHTTPHandlerFunc(pprof.Handler("threadcreate").ServeHTTP))
+		prefixRouter.GET("/profile", adaptor.NewHertzHTTPHandlerFunc(pprof.Profile))
+		prefixRouter.POST("/symbol", adaptor.NewHertzHTTPHandlerFunc(pprof.Symbol))
+		prefixRouter.GET("/symbol", adaptor.NewHertzHTTPHandlerFunc(pprof.Symbol))
+		prefixRouter.GET("/trace", adaptor.NewHertzHTTPHandlerFunc(pprof.Trace))
+		prefixRouter.GET("/allocs", adaptor.NewHertzHTTPHandlerFunc(pprof.Handler("allocs").ServeHTTP))
+		prefixRouter.GET("/block", adaptor.NewHertzHTTPHandlerFunc(pprof.Handler("block").ServeHTTP))
+		prefixRouter.GET("/goroutine", adaptor.NewHertzHTTPHandlerFunc(pprof.Handler("goroutine").ServeHTTP))
+		prefixRouter.GET("/heap", adaptor.NewHertzHTTPHandlerFunc(pprof.Handler("heap").ServeHTTP))
+		prefixRouter.GET("/mutex", adaptor.NewHertzHTTPHandlerFunc(pprof.Handler("mutex").ServeHTTP))
+		prefixRouter.GET("/threadcreate", adaptor.NewHertzHTTPHandlerFunc(pprof.Handler("threadcreate").ServeHTTP))
 	}
 }
