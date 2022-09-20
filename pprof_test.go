@@ -81,6 +81,30 @@ func Test_Pprof_Index(t *testing.T) {
 	assert.DeepEqual(t, true, bytes.Contains(b, []byte("<title>/debug/pprof/</title>")))
 }
 
+func Test_Pprof_Router_Group(t *testing.T) {
+	bearerToken := "Bearer token"
+	h := server.New()
+	Register(h)
+	adminGroup := h.Group("/admin", func(c context.Context, ctx *app.RequestContext) {
+		if ctx.Request.Header.Get("Authorization") != bearerToken {
+			ctx.AbortWithStatus(http.StatusForbidden)
+			return
+		}
+		ctx.Next(c)
+	})
+	RouteRegister(adminGroup, "pprof")
+
+	resp := ut.PerformRequest(h.Engine, http.MethodGet, "/admin/pprof/", nil)
+	assert.DeepEqual(t, http.StatusForbidden, resp.Code)
+
+	header := ut.Header{
+		Key:   "Authorization",
+		Value: bearerToken,
+	}
+	resp = ut.PerformRequest(h.Engine, http.MethodGet, "/admin/pprof/", nil, header)
+	assert.DeepEqual(t, http.StatusOK, resp.Code)
+}
+
 func Test_Pprof_Subs(t *testing.T) {
 	h := server.Default()
 
@@ -102,7 +126,7 @@ func Test_Pprof_Subs(t *testing.T) {
 				target += "?seconds=1"
 			}
 			resp := ut.PerformRequest(h.Engine, http.MethodGet, target, nil)
-			assert.DeepEqual(t, 200, resp.Code)
+			assert.DeepEqual(t, http.StatusOK, resp.Code)
 		})
 	}
 }
@@ -117,5 +141,5 @@ func Test_Pprof_Other(t *testing.T) {
 	})
 
 	resp := ut.PerformRequest(h.Engine, http.MethodGet, "/debug/pprof/302", nil)
-	assert.DeepEqual(t, 404, resp.Code)
+	assert.DeepEqual(t, http.StatusNotFound, resp.Code)
 }
