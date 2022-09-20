@@ -24,6 +24,7 @@ import (
 	"github.com/cloudwego/hertz/pkg/common/adaptor"
 	"github.com/cloudwego/hertz/pkg/common/hlog"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
+	"github.com/savsgio/gotils/strconv"
 )
 
 // NewHertzHTTPHandlerFunc wraps net/http handler to hertz app.HandlerFunc,
@@ -70,7 +71,7 @@ func NewHertzHTTPHandler(h http.Handler) app.HandlerFunc {
 			c.String(http.StatusInternalServerError, consts.StatusMessage(http.StatusInternalServerError))
 			return
 		}
-		req.RequestURI = B2s(c.Request.RequestURI())
+		req.RequestURI = strconv.B2S(c.Request.RequestURI())
 		rw := adaptor.GetCompatResponseWriter(&c.Response)
 		c.ForEachKey(func(k string, v interface{}) {
 			ctx = context.WithValue(ctx, k, v)

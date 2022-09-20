@@ -20,103 +20,97 @@ import (
 	"context"
 	"io/ioutil"
 	"net/http"
-	"strings"
+	"net/url"
+	"reflect"
 	"testing"
-	"time"
 
 	"github.com/cloudwego/hertz/pkg/app"
-	"github.com/cloudwego/hertz/pkg/app/server"
-	"github.com/cloudwego/hertz/pkg/common/adaptor"
+	"github.com/cloudwego/hertz/pkg/common/test/assert"
+	"github.com/cloudwego/hertz/pkg/protocol"
+	"github.com/cloudwego/hertz/pkg/protocol/consts"
 )
 
-func TestCompatResponse_WriteHeader(t *testing.T) {
-	var testHeader http.Header
-	var testBody string
-	testUrl := "http://127.0.0.1:9000/test"
-	testStatusCode := 299
+func TestNewHertzHandler(t *testing.T) {
+	t.Parallel()
 
-	testHeader = make(map[string][]string)
-	testHeader["Key1"] = []string{"value1"}
-	testHeader["Key2"] = []string{"value2", "value22"}
-	testHeader["Key3"] = []string{"value3", "value33", "value333"}
-
-	testBody = "test body"
-
-	h := server.New(server.WithHostPorts("127.0.0.1:9000"))
-	h.POST("/test", func(c context.Context, ctx *app.RequestContext) {
-		req, _ := adaptor.GetCompatRequest(&ctx.Request)
-		resp := adaptor.GetCompatResponseWriter(&ctx.Response)
-		handlerAndCheck(t, resp, req, testHeader, testBody, testStatusCode)
-	})
-
-	go h.Spin()
-	time.Sleep(200 * time.Millisecond)
-
-	makeACall(t, http.MethodPost, testUrl, testHeader, testBody, testStatusCode)
-}
-
-func makeACall(t *testing.T, method, url string, header http.Header, body string, expectStatusCode int) {
-	client := http.Client{}
-	req, _ := http.NewRequest(method, url, strings.NewReader(body))
-	req.Header = header
-	resp, err := client.Do(req)
-	if err != nil {
-		t.Fatalf("make a call error: %s", err)
+	expectedMethod := consts.MethodPost
+	expectedProto := "HTTP/1.1"
+	expectedProtoMajor := 1
+	expectedProtoMinor := 1
+	expectedRequestURI := "http://foobar.com/foo/bar?baz=123"
+	expectedBody := "<!doctype html><html>"
+	expectedContentLength := len(expectedBody)
+	expectedHost := "foobar.com"
+	expectedHeader := map[string]string{
+		"Foo-Bar":         "baz",
+		"Abc":             "defg",
+		"XXX-Remote-Addr": "123.43.4543.345",
 	}
+	expectedURL, err := url.ParseRequestURI(expectedRequestURI)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	expectedContextKey := "contextKey"
+	expectedContextValue := "contextValue"
+	expectedContentType := "text/html; charset=utf-8"
 
-	respHeader := resp.Header
-
-	for k, v := range header {
-		for i := 0; i < len(v); i++ {
-			if respHeader[k][i] != v[i] {
-				t.Fatalf("Header error: want %s=%s, got %s=%s", respHeader[k], respHeader[k][i], respHeader[k], v[i])
+	callsCount := 0
+	nethttpH := func(w http.ResponseWriter, r *http.Request) {
+		callsCount++
+		assert.Assertf(t, r.Method == expectedMethod, "unexpected method %q. Expecting %q", r.Method, expectedMethod)
+		assert.Assertf(t, r.Proto == expectedProto, "unexpected proto %q. Expecting %q", r.Proto, expectedProto)
+		assert.Assertf(t, r.ProtoMajor == expectedProtoMajor, "unexpected protoMajor %d. Expecting %d", r.ProtoMajor, expectedProtoMajor)
+		assert.Assertf(t, r.ProtoMinor == expectedProtoMinor, "unexpected protoMinor %d. Expecting %d", r.ProtoMinor, expectedProtoMinor)
+		assert.Assertf(t, r.RequestURI == expectedRequestURI, "unexpected requestURI %q. Expecting %q", r.RequestURI, expectedRequestURI)
+		assert.Assertf(t, r.ContentLength == int64(expectedContentLength), "unexpected contentLength %d. Expecting %d", r.ContentLength, expectedContentLength)
+		assert.Assertf(t, len(r.TransferEncoding) == 0, "unexpected transferEncoding %q. Expecting []", r.TransferEncoding)
+		assert.Assertf(t, r.Host == expectedHost, "unexpected host %q. Expecting %q", r.Host, expectedHost)
+		body, err := ioutil.ReadAll(r.Body)
+		r.Body.Close()
+		if err != nil {
+			t.Fatalf("unexpected error when reading request body: %v", err)
+		}
+		assert.Assertf(t, string(body) == expectedBody, "unexpected body %q. Expecting %q", body, expectedBody)
+		assert.Assertf(t, reflect.DeepEqual(r.URL, expectedURL), "unexpected URL: %#v. Expecting %#v", r.URL, expectedURL)
+		assert.Assertf(t, r.Context().Value(expectedContextKey) == expectedContextValue,
+			"unexpected context value for key %q. Expecting %q, in fact: %v", expectedContextKey,
+			expectedContextValue, r.Context().Value(expectedContextKey))
+		for k, expectedV := range expectedHeader {
+			v := r.Header.Get(k)
+			if v != expectedV {
+				t.Fatalf("unexpected header value %q for key %q. Expecting %q", v, k, expectedV)
 			}
 		}
+		w.Header().Set("Header1", "value1")
+		w.Header().Set("Header2", "value2")
+		w.WriteHeader(http.StatusBadRequest) // nolint:errcheck
+		w.Write(body)
 	}
-
-	b, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		t.Fatalf("Read body error: %s", err)
+	hertzH := NewHertzHTTPHandler(http.HandlerFunc(nethttpH))
+	hertzH = setContextValueMiddleware(hertzH, expectedContextKey, expectedContextValue)
+	var ctx app.RequestContext
+	var req protocol.Request
+	req.Header.SetMethod(expectedMethod)
+	req.SetRequestURI(expectedRequestURI)
+	req.Header.SetHost(expectedHost)
+	req.BodyWriter().Write([]byte(expectedBody)) // nolint:errcheck
+	for k, v := range expectedHeader {
+		req.Header.Set(k, v)
 	}
-	if string(b) != body {
-		t.Fatalf("Body not equal: want: %s, got: %s", body, string(b))
-	}
-
-	if resp.StatusCode != expectStatusCode {
-		t.Fatalf("Status code not equal: want: %d, got: %d", expectStatusCode, resp.StatusCode)
-	}
+	req.CopyTo(&ctx.Request)
+	hertzH(context.Background(), &ctx)
+	assert.Assertf(t, callsCount == 1, "unexpected callsCount: %d. Expecting 1", callsCount)
+	resp := &ctx.Response
+	assert.Assertf(t, resp.StatusCode() == http.StatusBadRequest, "unexpected statusCode: %d. Expecting %d", resp.StatusCode(), http.StatusBadRequest)
+	assert.Assertf(t, string(resp.Header.Peek("Header1")) == "value1", "unexpected header value: %q. Expecting %q", resp.Header.Peek("Header1"), "value1")
+	assert.Assertf(t, string(resp.Header.Peek("Header2")) == "value2", "unexpected header value: %q. Expecting %q", resp.Header.Peek("Header2"), "value2")
+	assert.Assertf(t, string(resp.Body()) == expectedBody, "unexpected response body %q. Expecting %q", resp.Body(), expectedBody)
+	assert.Assertf(t, string(resp.Header.Peek("Content-Type")) == expectedContentType, "unexpected content-type %q. Expecting %q", string(resp.Header.Peek("Content-Type")), expectedContentType)
 }
 
-func handlerAndCheck(t *testing.T, writer http.ResponseWriter, request *http.Request, wantHeader http.Header, wantBody string, statusCode int) {
-	reqHeader := request.Header
-	for k, v := range wantHeader {
-		if reqHeader[k] == nil {
-			t.Fatalf("Header error: want %s=%s, got %s=nil", reqHeader[k], reqHeader[k][0], reqHeader[k])
-		}
-		if reqHeader[k][0] != v[0] {
-			t.Fatalf("Header error: want %s=%s, got %s=%s", reqHeader[k], reqHeader[k][0], reqHeader[k], v[0])
-		}
-	}
-
-	body, err := ioutil.ReadAll(request.Body)
-	if err != nil {
-		t.Fatalf("Read body error: %s", err)
-	}
-	if string(body) != wantBody {
-		t.Fatalf("Body not equal: want: %s, got: %s", wantBody, string(body))
-	}
-
-	respHeader := writer.Header()
-	for k, v := range reqHeader {
-		respHeader[k] = v
-	}
-	writer.WriteHeader(statusCode)
-	_, err = writer.Write([]byte("test"))
-	if err != nil {
-		t.Fatalf("Write body error: %s", err)
-	}
-	_, err = writer.Write([]byte(" body"))
-	if err != nil {
-		t.Fatalf("Write body error: %s", err)
+func setContextValueMiddleware(next app.HandlerFunc, key string, value interface{}) app.HandlerFunc {
+	return func(ctx context.Context, c *app.RequestContext) {
+		c.Set(key, value)
+		next(ctx, c)
 	}
 }
