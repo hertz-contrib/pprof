@@ -1,5 +1,6 @@
 # pprof (This is a community driven project)
 
+English | [中文](README_CN.md)
 
 pprof middleware for Hertz framework, inspired by [pprof](https://github.com/gin-contrib/pprof).
 This project would not have been possible without the support from the CloudWeGo community and previous work done by the gin community.
