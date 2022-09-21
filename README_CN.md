@@ -1,20 +1,18 @@
-# pprof (This is a community driven project)
+# pprof (本项目由CloudWeGo社区贡献者协作开发并维护)
 
-English | [中文](README_CN.md)
+[English](README.md) | 中文
 
-pprof middleware for Hertz framework, inspired by [pprof](https://github.com/gin-contrib/pprof).
-This project would not have been possible without the support from the CloudWeGo community and previous work done by the gin community.
-
-- Package pprof serves via its HTTP server runtime profiling data in the format expected by the pprof visualization tool.
+pprof 是为 Hertz 框架开发的中间件，参考了 [Gin](https://github.com/gin-gonic/gin) 中 [pprof](https://github.com/gin-contrib/pprof) 的实现。
+本项目的完成得益于 CloudWeGo 社区的工作以及 Gin 社区所做的相关前置工作。
 
 
-## Install
+## 安装
 ```shell
 go get github.com/hertz-contrib/pprof
 ```
 
-## Usage
-### Example
+## 使用
+### 代码实例1
 
 ```go
 func main() {
@@ -30,7 +28,7 @@ func main() {
 }
 ```
 
-### change default path prefix
+### 代码实例2: 自定义前缀
 
 ```go
 import (
@@ -57,7 +55,7 @@ func main() {
 
 ```
 
-### custom router group
+### 代码实例3: 自定义路由组
 
 ```go
 import (
@@ -86,27 +84,27 @@ func main() {
 ```
 
 
-### Use the pprof tool
+### 如何使用
 
-Then use the pprof tool to look at the heap profile:
+使用 `pprof tool` 工具查看堆栈采样信息：
 
 ```bash
 go tool pprof http://localhost:8888/debug/pprof/heap
 ```
 
-Or to look at a 30-second CPU profile:
+使用 `pprof tool` 工具查看 30s 的 CPU 采样信息：
 
 ```bash
 go tool pprof http://localhost:8888/debug/pprof/profile
 ```
 
-Or to look at the goroutine blocking profile, after calling runtime.SetBlockProfileRate in your program:
+使用 `pprof tool` 工具查看 go 协程阻塞信息：
 
 ```bash
 go tool pprof http://localhost:8888/debug/pprof/block
 ```
 
-Or to collect a 5-second execution trace:
+使用 `pprof tool` 工具查看 5s 内的执行 trace：
 
 ```bash
 wget http://localhost:8888/debug/pprof/trace?seconds=5
