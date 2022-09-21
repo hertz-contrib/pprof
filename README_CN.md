@@ -2,8 +2,8 @@
 
 [English](README.md) | 中文
 
-pprof是为Hertz框架开发的中间件，参考了[Gin](https://github.com/gin-gonic/gin)中[pprof](https://github.com/gin-contrib/pprof)的实现。
-本项目的完成得益于CloudWeGo社区的工作以及Gin社区所做的相关前置工作。
+pprof 是为 Hertz 框架开发的中间件，参考了 [Gin](https://github.com/gin-gonic/gin) 中 [pprof](https://github.com/gin-contrib/pprof) 的实现。
+本项目的完成得益于 CloudWeGo 社区的工作以及 Gin 社区所做的相关前置工作。
 
 
 ## 安装
