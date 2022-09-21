@@ -92,19 +92,19 @@ func main() {
 go tool pprof http://localhost:8888/debug/pprof/heap
 ```
 
-使用 `pprof tool` 工具查看30s的CPU采样信息：
+使用 `pprof tool` 工具查看 30s 的 CPU 采样信息：
 
 ```bash
 go tool pprof http://localhost:8888/debug/pprof/profile
 ```
 
-使用 `pprof tool` 工具查看go 协程阻塞信息：
+使用 `pprof tool` 工具查看 go 协程阻塞信息：
 
 ```bash
 go tool pprof http://localhost:8888/debug/pprof/block
 ```
 
-使用 `pprof tool` 工具查看5s内的执行trace：
+使用 `pprof tool` 工具查看 5s 内的执行 trace：
 
 ```bash
 wget http://localhost:8888/debug/pprof/trace?seconds=5
