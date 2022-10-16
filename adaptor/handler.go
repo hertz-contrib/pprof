@@ -19,12 +19,12 @@ package adaptor
 import (
 	"context"
 	"net/http"
+	"unsafe"
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/common/adaptor"
 	"github.com/cloudwego/hertz/pkg/common/hlog"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
-	"github.com/savsgio/gotils/strconv"
 )
 
 // NewHertzHTTPHandlerFunc wraps net/http handler to hertz app.HandlerFunc,
@@ -71,7 +71,7 @@ func NewHertzHTTPHandler(h http.Handler) app.HandlerFunc {
 			c.String(http.StatusInternalServerError, consts.StatusMessage(http.StatusInternalServerError))
 			return
 		}
-		req.RequestURI = strconv.B2S(c.Request.RequestURI())
+		req.RequestURI = b2s(c.Request.RequestURI())
 		rw := adaptor.GetCompatResponseWriter(&c.Response)
 		c.ForEachKey(func(k string, v interface{}) {
 			ctx = context.WithValue(ctx, k, v)
@@ -89,4 +89,13 @@ func NewHertzHTTPHandler(h http.Handler) app.HandlerFunc {
 			c.Response.Header.Set(consts.HeaderContentType, http.DetectContentType(body[:l]))
 		}
 	}
+}
+
+// b2s converts byte slice to a string without memory allocation.
+// See https://groups.google.com/forum/#!msg/Golang-Nuts/ENgbUzYvCuU/90yGx7GUAgAJ .
+//
+// Note it may break if string and/or slice header will change
+// in the future go versions.
+func b2s(b []byte) string {
+	return *(*string)(unsafe.Pointer(&b))
 }
