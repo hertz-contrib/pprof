@@ -30,7 +30,6 @@ import (
 
 	"github.com/cloudwego/hertz/pkg/app/server"
 	"github.com/cloudwego/hertz/pkg/route"
-
 	"github.com/hertz-contrib/pprof/adaptor"
 )
 
