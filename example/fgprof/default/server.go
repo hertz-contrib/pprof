@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 CloudWeGo Authors
+ * Copyright 2023 CloudWeGo Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -48,21 +48,18 @@ import (
 	"github.com/cloudwego/hertz/pkg/app/server"
 	"github.com/cloudwego/hertz/pkg/common/utils"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
+
 	"github.com/hertz-contrib/pprof"
 )
 
 func main() {
 	h := server.Default()
 
-	pprof.Register(h)
+	pprof.FgprofRegister(h)
 
-	adminGroup := h.Group("/admin")
-
-	adminGroup.GET("/ping", func(c context.Context, ctx *app.RequestContext) {
+	h.GET("/ping", func(c context.Context, ctx *app.RequestContext) {
 		ctx.JSON(consts.StatusOK, utils.H{"ping": "pong"})
 	})
-
-	pprof.RouteRegister(adminGroup, "pprof")
 
 	h.Spin()
 }
