@@ -9,7 +9,7 @@ This project would not have been possible without the support from the CloudWeGo
 
 fgprof inspired by [fgprof](https://github.com/felixge/fgprof).
 
-If you use fgprof,please upgrade to Go 1.19 or newer. In older versions of Go fgprof can cause significant STW latencies in applications with a lot of goroutines (> 1-10k). See [CL 387415](https://go-review.googlesource.com/c/go/+/387415) for more details.
+If fgprof is used,please upgrade to Go 1.19 or newer. In older versions of Go fgprof can cause significant STW latencies in applications with a lot of goroutines (> 1-10k). See [CL 387415](https://go-review.googlesource.com/c/go/+/387415) for more details.
 
 
 ## Install
@@ -222,7 +222,7 @@ wget http://localhost:8888/debug/pprof/trace?seconds=5
 
 ### Use the fgprof tool
 
-Taking and analyzing a 3s profile is as simple：
+Taking and analyzing a 3s profile：
 
 ```
 go tool pprof --http=:6061 http://localhost:6060/debug/fgprof?seconds=3
