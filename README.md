@@ -18,7 +18,7 @@ go get github.com/hertz-contrib/pprof
 ```
 
 ## Usage
-### Pprof Example 
+### pprof Example 
 
 ```go
 package main
