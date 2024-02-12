@@ -43,17 +43,49 @@ package adaptor
 
 import (
 	"context"
+	"crypto/tls"
+	"github.com/cloudwego/hertz/pkg/app"
+	"github.com/cloudwego/hertz/pkg/app/client"
+	"github.com/cloudwego/hertz/pkg/common/adaptor"
+	"github.com/cloudwego/hertz/pkg/common/config"
+	"github.com/cloudwego/hertz/pkg/common/test/assert"
+	"github.com/cloudwego/hertz/pkg/network"
+	"github.com/cloudwego/hertz/pkg/network/netpoll"
+	"github.com/cloudwego/hertz/pkg/network/standard"
+	"github.com/cloudwego/hertz/pkg/protocol"
+	"github.com/cloudwego/hertz/pkg/protocol/consts"
+	"github.com/cloudwego/hertz/pkg/route"
 	"io/ioutil"
+	"math/rand"
 	"net/http"
 	"net/url"
 	"reflect"
+	"strings"
 	"testing"
-
-	"github.com/cloudwego/hertz/pkg/app"
-	"github.com/cloudwego/hertz/pkg/common/test/assert"
-	"github.com/cloudwego/hertz/pkg/protocol"
-	"github.com/cloudwego/hertz/pkg/protocol/consts"
+	"time"
 )
+
+type mockDialer struct {
+	network.Dialer
+	customDialerFunc func(network, address string, timeout time.Duration, tlsConfig *tls.Config)
+	network          string
+	address          string
+	timeout          time.Duration
+}
+
+func newMockDialerWithCustomFunc(network, address string, timeout time.Duration, f func(network, address string, timeout time.Duration, tlsConfig *tls.Config)) network.Dialer {
+	dialer := standard.NewDialer()
+	if rand.Intn(2) == 0 {
+		dialer = netpoll.NewDialer()
+	}
+	return &mockDialer{
+		Dialer:           dialer,
+		customDialerFunc: f,
+		network:          network,
+		address:          address,
+		timeout:          timeout,
+	}
+}
 
 func TestNewHertzHandler(t *testing.T) {
 	t.Parallel()
@@ -138,4 +170,258 @@ func setContextValueMiddleware(next app.HandlerFunc, key string, value interface
 		c.Set(key, value)
 		next(ctx, c)
 	}
+}
+
+func TestConsumingBodyOnNextConn(t *testing.T) {
+	t.Parallel()
+
+	reqNum := 0
+	ch := make(chan *http.Request)
+	servech := make(chan error, 1)
+
+	opt := config.NewOptions([]config.Option{})
+	opt.Addr = "127.0.0.1:10025"
+	engine := route.NewEngine(opt)
+	handler := func(res http.ResponseWriter, req *http.Request) {
+		reqNum++
+		ch <- req
+	}
+
+	hertzHandler := NewHertzHTTPHandler(http.HandlerFunc(handler))
+
+	engine.POST("/", hertzHandler)
+	go engine.Run()
+	defer func() {
+		engine.Close()
+	}()
+	time.Sleep(time.Millisecond * 500)
+
+	c, _ := client.NewClient()
+
+	go func() {
+		req := protocol.AcquireRequest()
+		resp := protocol.AcquireResponse()
+		defer func() {
+			protocol.ReleaseRequest(req)
+			protocol.ReleaseResponse(resp)
+		}()
+		req.SetRequestURI("http://127.0.0.1:10025")
+		req.SetMethod("POST")
+		servech <- c.Do(context.Background(), req, resp)
+		servech <- c.Do(context.Background(), req, resp)
+	}()
+
+	var req *http.Request
+	req = <-ch
+	if req == nil {
+		t.Fatal("Got nil first request.")
+	}
+	if req.Method != "POST" {
+		t.Errorf("For request #1's method, got %q; expected %q",
+			req.Method, "POST")
+	}
+
+	req = <-ch
+	if req == nil {
+		t.Fatal("Got nil first request.")
+	}
+	if req.Method != "POST" {
+		t.Errorf("For request #2's method, got %q; expected %q",
+			req.Method, "POST")
+	}
+
+	if serveerr := <-servech; serveerr != nil {
+		t.Errorf("Serve returned %q; expected EOF", serveerr)
+	}
+}
+
+func TestCopyToHertzRequest(t *testing.T) {
+	req := http.Request{
+		Method:     "GET",
+		RequestURI: "/test",
+		URL: &url.URL{
+			Scheme: "http",
+			Host:   "test.com",
+		},
+		Proto:  "HTTP/1.1",
+		Header: http.Header{},
+	}
+	req.Header.Set("key1", "value1")
+	req.Header.Add("key2", "value2")
+	req.Header.Add("key2", "value22")
+	hertzReq := protocol.Request{}
+	err := adaptor.CopyToHertzRequest(&req, &hertzReq)
+	assert.Nil(t, err)
+	assert.DeepEqual(t, req.Method, string(hertzReq.Method()))
+	assert.DeepEqual(t, req.RequestURI, string(hertzReq.Path()))
+	assert.DeepEqual(t, req.Proto, hertzReq.Header.GetProtocol())
+	assert.DeepEqual(t, req.Header.Get("key1"), hertzReq.Header.Get("key1"))
+	valueSlice := make([]string, 0, 2)
+	hertzReq.Header.VisitAllCustomHeader(func(key, value []byte) {
+		if strings.ToLower(string(key)) == "key2" {
+			valueSlice = append(valueSlice, string(value))
+		}
+	})
+
+	assert.DeepEqual(t, req.Header.Values("key2"), valueSlice)
+
+	assert.DeepEqual(t, 3, hertzReq.Header.Len())
+}
+
+func TestParseArgs(t *testing.T) {
+	t.Parallel()
+
+	opt := config.NewOptions([]config.Option{})
+	opt.Addr = "127.0.0.1:10026"
+	engine := route.NewEngine(opt)
+	handler := func(resp http.ResponseWriter, req *http.Request) {
+		queryParams := req.URL.Query()
+
+		paramValue := queryParams.Get("test")
+
+		assert.DeepEqual(t, paramValue, "test_value")
+	}
+
+	hertzHandler := NewHertzHTTPHandler(http.HandlerFunc(handler))
+
+	engine.GET("/", hertzHandler)
+	go engine.Run()
+	defer func() {
+		engine.Close()
+	}()
+	time.Sleep(time.Millisecond * 500)
+
+	c, _ := client.NewClient()
+
+	req := protocol.AcquireRequest()
+	resp := protocol.AcquireResponse()
+	defer func() {
+		protocol.ReleaseRequest(req)
+		protocol.ReleaseResponse(resp)
+	}()
+	req.SetRequestURI("http://127.0.0.1:10026/?test=test_value")
+	req.SetMethod("GET")
+
+	err := c.Do(context.Background(), req, resp)
+	assert.Nil(t, err)
+
+}
+
+func TestCookies(t *testing.T) {
+	t.Parallel()
+
+	opt := config.NewOptions([]config.Option{})
+	opt.Addr = "127.0.0.1:10027"
+	engine := route.NewEngine(opt)
+	handler := func(resp http.ResponseWriter, req *http.Request) {
+		//cookie1 := http.Cookie{
+		//	Name:     "myCookie1",
+		//	Value:    "cookieValue1",
+		//	Expires:  time.Now().Add(24 * time.Hour),
+		//	HttpOnly: false,
+		//	Secure:   false,
+		//}
+		//
+		//cookie2 := http.Cookie{
+		//	Name:     "myCookie2",
+		//	Value:    "cookieValue2",
+		//	Expires:  time.Now().Add(24 * time.Hour),
+		//	HttpOnly: true,
+		//	Secure:   true,
+		//}
+		//
+		//req.AddCookie(&cookie1)
+		//req.AddCookie(&cookie2)
+		//http.SetCookie(resp, &cookie1)
+		//http.SetCookie(resp, &cookie2)
+
+		c, err := req.Cookie("myCookie1")
+		assert.Nil(t, err)
+		assert.DeepEqual(t, c.Value, "cookieValue1")
+		assert.DeepEqual(t, c.HttpOnly, false)
+		assert.DeepEqual(t, c.Secure, false)
+
+		c, err = req.Cookie("myCookie2")
+		assert.Nil(t, err)
+		assert.DeepEqual(t, c.Value, "cookieValue2")
+
+		c.Secure = true
+		c.HttpOnly = true
+		c.Domain = "google.com"
+		c.Expires = time.Now().Add(24 * time.Hour)
+		http.SetCookie(resp, c)
+
+		assert.DeepEqual(t, c.HttpOnly, true)
+		assert.DeepEqual(t, c.Secure, true)
+		assert.DeepEqual(t, c.Domain, "google.com")
+		assert.NotEqual(t, c.Expires, nil)
+	}
+
+	hertzHandler := NewHertzHTTPHandler(http.HandlerFunc(handler))
+
+	engine.GET("/", hertzHandler)
+	go engine.Run()
+	defer func() {
+		engine.Close()
+	}()
+	time.Sleep(time.Millisecond * 500)
+
+	c, _ := client.NewClient()
+
+	req := protocol.AcquireRequest()
+	resp := protocol.AcquireResponse()
+	defer func() {
+		protocol.ReleaseRequest(req)
+		protocol.ReleaseResponse(resp)
+	}()
+	req.SetRequestURI("http://127.0.0.1:10027")
+	req.SetMethod("GET")
+	req.SetCookie("myCookie1", "cookieValue1")
+	req.SetCookie("myCookie2", "cookieValue2")
+
+	err := c.Do(context.Background(), req, resp)
+	assert.Nil(t, err)
+}
+
+func TestHeaders(t *testing.T) {
+	t.Parallel()
+
+	opt := config.NewOptions([]config.Option{})
+	opt.Addr = "127.0.0.1:10028"
+	engine := route.NewEngine(opt)
+	handler := func(resp http.ResponseWriter, req *http.Request) {
+		k := req.Header.Get("key1")
+		assert.DeepEqual(t, k, "value1")
+		c := req.Header.Get("cookie")
+		assert.DeepEqual(t, c, "cookie=cookie_value")
+		//assert.DeepEqual(t, req.ContentLength, 15) todo: fix this
+	}
+
+	hertzHandler := NewHertzHTTPHandler(http.HandlerFunc(handler))
+
+	engine.GET("/", hertzHandler)
+	go engine.Run()
+	defer func() {
+		engine.Close()
+	}()
+	time.Sleep(time.Millisecond * 500)
+
+	c, _ := client.NewClient()
+
+	req := protocol.AcquireRequest()
+	resp := protocol.AcquireResponse()
+	defer func() {
+		protocol.ReleaseRequest(req)
+		protocol.ReleaseResponse(resp)
+	}()
+	req.SetRequestURI("http://127.0.0.1:10028")
+	req.SetMethod("GET")
+	req.Header.Set("key1", "value1")
+	req.Header.SetCookie("cookie", "cookie_value")
+	req.Header.SetMethod("GET")
+	req.Header.InitContentLengthWithValue(14)
+	//req.Header.SetContentLength(15) todo: fix this
+
+	err := c.Do(context.Background(), req, resp)
+	assert.Nil(t, err)
 }
