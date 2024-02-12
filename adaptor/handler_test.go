@@ -43,49 +43,23 @@ package adaptor
 
 import (
 	"context"
-	"crypto/tls"
-	"github.com/cloudwego/hertz/pkg/app"
-	"github.com/cloudwego/hertz/pkg/app/client"
-	"github.com/cloudwego/hertz/pkg/common/adaptor"
-	"github.com/cloudwego/hertz/pkg/common/config"
-	"github.com/cloudwego/hertz/pkg/common/test/assert"
-	"github.com/cloudwego/hertz/pkg/network"
-	"github.com/cloudwego/hertz/pkg/network/netpoll"
-	"github.com/cloudwego/hertz/pkg/network/standard"
-	"github.com/cloudwego/hertz/pkg/protocol"
-	"github.com/cloudwego/hertz/pkg/protocol/consts"
-	"github.com/cloudwego/hertz/pkg/route"
 	"io/ioutil"
-	"math/rand"
 	"net/http"
 	"net/url"
 	"reflect"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/cloudwego/hertz/pkg/app"
+	"github.com/cloudwego/hertz/pkg/app/client"
+	"github.com/cloudwego/hertz/pkg/common/adaptor"
+	"github.com/cloudwego/hertz/pkg/common/config"
+	"github.com/cloudwego/hertz/pkg/common/test/assert"
+	"github.com/cloudwego/hertz/pkg/protocol"
+	"github.com/cloudwego/hertz/pkg/protocol/consts"
+	"github.com/cloudwego/hertz/pkg/route"
 )
-
-type mockDialer struct {
-	network.Dialer
-	customDialerFunc func(network, address string, timeout time.Duration, tlsConfig *tls.Config)
-	network          string
-	address          string
-	timeout          time.Duration
-}
-
-func newMockDialerWithCustomFunc(network, address string, timeout time.Duration, f func(network, address string, timeout time.Duration, tlsConfig *tls.Config)) network.Dialer {
-	dialer := standard.NewDialer()
-	if rand.Intn(2) == 0 {
-		dialer = netpoll.NewDialer()
-	}
-	return &mockDialer{
-		Dialer:           dialer,
-		customDialerFunc: f,
-		network:          network,
-		address:          address,
-		timeout:          timeout,
-	}
-}
 
 func TestNewHertzHandler(t *testing.T) {
 	t.Parallel()
@@ -304,7 +278,6 @@ func TestParseArgs(t *testing.T) {
 
 	err := c.Do(context.Background(), req, resp)
 	assert.Nil(t, err)
-
 }
 
 func TestCookies(t *testing.T) {
@@ -394,7 +367,7 @@ func TestHeaders(t *testing.T) {
 		assert.DeepEqual(t, k, "value1")
 		c := req.Header.Get("cookie")
 		assert.DeepEqual(t, c, "cookie=cookie_value")
-		//assert.DeepEqual(t, req.ContentLength, 15) todo: fix this
+		// assert.DeepEqual(t, req.ContentLength, 15) todo: fix this
 	}
 
 	hertzHandler := NewHertzHTTPHandler(http.HandlerFunc(handler))
@@ -420,7 +393,7 @@ func TestHeaders(t *testing.T) {
 	req.Header.SetCookie("cookie", "cookie_value")
 	req.Header.SetMethod("GET")
 	req.Header.InitContentLengthWithValue(14)
-	//req.Header.SetContentLength(15) todo: fix this
+	// req.Header.SetContentLength(15) todo: fix this
 
 	err := c.Do(context.Background(), req, resp)
 	assert.Nil(t, err)
