@@ -287,7 +287,6 @@ func TestCookies(t *testing.T) {
 	opt.Addr = "127.0.0.1:10027"
 	engine := route.NewEngine(opt)
 	handler := func(resp http.ResponseWriter, req *http.Request) {
-
 		c, err := req.Cookie("myCookie1")
 		assert.Nil(t, err)
 		assert.DeepEqual(t, c.Value, "cookieValue1")
@@ -399,7 +398,6 @@ func TestForm(t *testing.T) {
 			return
 		}
 		assert.DeepEqual(t, req.FormValue("form_data"), "value")
-
 	}
 
 	hertzHandler := NewHertzHTTPHandler(http.HandlerFunc(handler))
