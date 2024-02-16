@@ -43,6 +43,7 @@ package adaptor
 
 import (
 	"context"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -467,58 +468,55 @@ func TestMultiForm(t *testing.T) {
 	assert.Nil(t, err)
 }
 
-//func TestFile(t *testing.T) {
-//	t.Parallel()
-//
-//	opt := config.NewOptions([]config.Option{})
-//	opt.Addr = "127.0.0.1:10031"
-//	engine := route.NewEngine(opt)
-//	handler := func(resp http.ResponseWriter, req *http.Request) {
-//		assert.NotEqual(t, req.Header.Get("Content-Type"), "application/x-www-form-urlencoded")
-//
-//		err := req.ParseMultipartForm(32 << 20)
-//		if err != nil {
-//			fmt.Println(err)
-//			panic(err)
-//		}
-//
-//		file, m, err := req.FormFile("adaptor")
-//		if err != nil {
-//			fmt.Println(err)
-//			panic(err)
-//		}
-//
-//		assert.DeepEqual(t, m.Filename, "handler.go")
-//
-//		content, err := ioutil.ReadAll(file)
-//		assert.Nil(t, err)
-//		assert.DeepEqual(t, string(content), "package adaptor\n")
-//
-//	}
-//
-//	hertzHandler := NewHertzHTTPHandler(http.HandlerFunc(handler))
-//
-//	engine.POST("/", hertzHandler)
-//	go engine.Run()
-//	defer func() {
-//		engine.Close()
-//	}()
-//	time.Sleep(time.Millisecond * 500)
-//
-//	c, _ := client.NewClient()
-//
-//	req := protocol.AcquireRequest()
-//	resp := protocol.AcquireResponse()
-//	defer func() {
-//		protocol.ReleaseRequest(req)
-//		protocol.ReleaseResponse(resp)
-//	}()
-//	req.SetRequestURI("http://127.0.0.1:10031")
-//	req.SetMethod("POST")
-//	req.SetFile("adaptor", "handler.go")
-//	fmt.Println(req.MultipartFiles()[0])
-//
-//	err := c.Do(context.Background(), req, resp)
-//	assert.Nil(t, err)
-//
-//} todo: fix this test
+func TestFile(t *testing.T) {
+	t.Parallel()
+
+	opt := config.NewOptions([]config.Option{})
+	opt.Addr = "127.0.0.1:10031"
+	engine := route.NewEngine(opt)
+	handler := func(resp http.ResponseWriter, req *http.Request) {
+		assert.NotEqual(t, req.Header.Get("Content-Type"), "application/x-www-form-urlencoded")
+
+		err := req.ParseForm()
+		if err != nil {
+			fmt.Println(err)
+			panic(err)
+		}
+
+		file, m, err := req.FormFile("file")
+		if err != nil {
+			fmt.Println(err)
+			panic(err)
+		}
+
+		assert.DeepEqual(t, m.Filename, "handler.go")
+
+		content, err := ioutil.ReadAll(file)
+		assert.Nil(t, err)
+		assert.True(t, len(content) > 0)
+	}
+
+	hertzHandler := NewHertzHTTPHandler(http.HandlerFunc(handler))
+
+	engine.POST("/", hertzHandler)
+	go engine.Run()
+	defer func() {
+		engine.Close()
+	}()
+	time.Sleep(time.Millisecond * 500)
+
+	c, _ := client.NewClient()
+
+	req := protocol.AcquireRequest()
+	resp := protocol.AcquireResponse()
+	defer func() {
+		protocol.ReleaseRequest(req)
+		protocol.ReleaseResponse(resp)
+	}()
+	req.SetRequestURI("http://127.0.0.1:10031")
+	req.SetMethod("POST")
+	req.SetFile("file", "handler.go")
+
+	err := c.Do(context.Background(), req, resp)
+	assert.Nil(t, err)
+}

@@ -90,7 +90,7 @@ func NewHertzHTTPHandlerFunc(h http.HandlerFunc) app.HandlerFunc {
 // Then manually convert net/http handlers to hertz handlers
 func NewHertzHTTPHandler(h http.Handler) app.HandlerFunc {
 	return func(ctx context.Context, c *app.RequestContext) {
-		req, err := adaptor.GetCompatRequest(c.GetRequest())
+		req, err := adaptor.GetCompatRequest(&c.Request)
 		if err != nil {
 			hlog.CtxErrorf(ctx, "HERTZ: Get request error: %v", err)
 			c.String(http.StatusInternalServerError, consts.StatusMessage(http.StatusInternalServerError))
