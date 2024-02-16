@@ -43,6 +43,7 @@ package adaptor
 
 import (
 	"context"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -477,10 +478,16 @@ func TestFile(t *testing.T) {
 		assert.NotEqual(t, req.Header.Get("Content-Type"), "application/x-www-form-urlencoded")
 
 		err := req.ParseForm()
-		assert.Nil(t, err)
+		if err != nil {
+			fmt.Println(err)
+			panic(err)
+		}
 
 		file, m, err := req.FormFile("file")
-		assert.Nil(t, err)
+		if err != nil {
+			fmt.Println(err)
+			panic(err)
+		}
 
 		assert.DeepEqual(t, m.Filename, "handler.go")
 
