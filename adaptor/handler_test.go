@@ -419,7 +419,7 @@ func TestForm(t *testing.T) {
 			return
 		}
 		assert.DeepEqual(t, req.FormValue("form_data"), "value")
-		//assert.DeepEqual(t, req.MultipartForm.Value["multiform_data"][0], "value")
+		// assert.DeepEqual(t, req.MultipartForm.Value["multiform_data"][0], "value")
 
 	}
 
@@ -444,11 +444,10 @@ func TestForm(t *testing.T) {
 	req.SetMethod("POST")
 
 	req.SetFormData(map[string]string{"form_data": "value"})
-	//req.SetMultipartFormData(map[string]string{"multiform_data": "value"})
+	// req.SetMultipartFormData(map[string]string{"multiform_data": "value"})
 
 	err := c.Do(context.Background(), req, resp)
 	assert.Nil(t, err)
-
 }
 
 func TestMultiForm(t *testing.T) {
@@ -464,7 +463,6 @@ func TestMultiForm(t *testing.T) {
 			return
 		}
 		assert.DeepEqual(t, req.FormValue("multiform_data"), "value")
-
 	}
 
 	hertzHandler := NewHertzHTTPHandler(http.HandlerFunc(handler))
@@ -491,7 +489,6 @@ func TestMultiForm(t *testing.T) {
 
 	err := c.Do(context.Background(), req, resp)
 	assert.Nil(t, err)
-
 }
 
 //func TestFile(t *testing.T) {
