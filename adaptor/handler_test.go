@@ -287,26 +287,6 @@ func TestCookies(t *testing.T) {
 	opt.Addr = "127.0.0.1:10027"
 	engine := route.NewEngine(opt)
 	handler := func(resp http.ResponseWriter, req *http.Request) {
-		//cookie1 := http.Cookie{
-		//	Name:     "myCookie1",
-		//	Value:    "cookieValue1",
-		//	Expires:  time.Now().Add(24 * time.Hour),
-		//	HttpOnly: false,
-		//	Secure:   false,
-		//}
-		//
-		//cookie2 := http.Cookie{
-		//	Name:     "myCookie2",
-		//	Value:    "cookieValue2",
-		//	Expires:  time.Now().Add(24 * time.Hour),
-		//	HttpOnly: true,
-		//	Secure:   true,
-		//}
-		//
-		//req.AddCookie(&cookie1)
-		//req.AddCookie(&cookie2)
-		//http.SetCookie(resp, &cookie1)
-		//http.SetCookie(resp, &cookie2)
 
 		c, err := req.Cookie("myCookie1")
 		assert.Nil(t, err)
@@ -419,7 +399,6 @@ func TestForm(t *testing.T) {
 			return
 		}
 		assert.DeepEqual(t, req.FormValue("form_data"), "value")
-		// assert.DeepEqual(t, req.MultipartForm.Value["multiform_data"][0], "value")
 
 	}
 
@@ -444,7 +423,6 @@ func TestForm(t *testing.T) {
 	req.SetMethod("POST")
 
 	req.SetFormData(map[string]string{"form_data": "value"})
-	// req.SetMultipartFormData(map[string]string{"multiform_data": "value"})
 
 	err := c.Do(context.Background(), req, resp)
 	assert.Nil(t, err)
